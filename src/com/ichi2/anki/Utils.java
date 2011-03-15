@@ -22,6 +22,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.net.Uri;
 import android.text.Html;
 import android.util.Log;
 import android.view.View;
@@ -88,7 +89,8 @@ public class Utils {
 
 
     /* Prevent class from being instantiated */
-    private Utils() { }
+    private Utils() {
+    }
 
     // Regex pattern used in removing tags from text before diff
     private static final Pattern imgPattern = Pattern.compile("<img src=[\"']?([^\"'>]+)[\"']? ?/?>");
@@ -96,7 +98,8 @@ public class Utils {
     private static final Pattern scriptPattern = Pattern.compile("(?s)<script.*?>.*?</script>");
     private static final Pattern tagPattern = Pattern.compile("<.*?>");
     private static final Pattern htmlEntitiesPattern = Pattern.compile("&#?\\w+;");
-    
+
+
     public static long genID() {
         long time = System.currentTimeMillis();
         long id;
@@ -123,6 +126,8 @@ public class Utils {
 
     private static final BigInteger shiftID = new BigInteger("18446744073709551616");
     private static final BigInteger maxID = new BigInteger("9223372036854775808");
+
+
     public static String hexifyID(long id) {
         if (id < 0) {
             BigInteger bid = BigInteger.valueOf(id);
@@ -130,7 +135,8 @@ public class Utils {
         }
         return Long.toHexString(id);
     }
-    
+
+
     public static long dehexifyID(String id) {
         BigInteger bid = new BigInteger(id, 16);
         if (bid.compareTo(maxID) >= 0) {
@@ -139,8 +145,10 @@ public class Utils {
         return bid.longValue();
     }
 
+
     /**
      * Returns a SQL string from an array of integers.
+     * 
      * @param ids The array of integers to include in the list.
      * @return An SQL compatible string in the format (ids[0],ids[1],..).
      */
@@ -148,7 +156,7 @@ public class Utils {
         String str = "()";
         if (ids != null) {
             str = Arrays.toString(ids);
-            str = "(" + str.substring(1, str.length()-1) + ")";
+            str = "(" + str.substring(1, str.length() - 1) + ")";
         }
         return str;
     }
@@ -156,6 +164,7 @@ public class Utils {
 
     /**
      * Returns a SQL string from an array of integers.
+     * 
      * @param ids The array of integers to include in the list.
      * @return An SQL compatible string in the format (ids[0],ids[1],..).
      */
@@ -183,6 +192,7 @@ public class Utils {
 
     /**
      * Returns a SQL string from an array of integers.
+     * 
      * @param ids The array of integers to include in the list.
      * @return An SQL compatible string in the format (ids[0],ids[1],..).
      */
@@ -226,6 +236,7 @@ public class Utils {
         return list;
     }
 
+
     /**
      * Strip HTML but keep media filenames
      */
@@ -233,6 +244,8 @@ public class Utils {
         Matcher imgMatcher = imgPattern.matcher(s);
         return stripHTML(imgMatcher.replaceAll(" $1 "));
     }
+
+
     public static String stripHTML(String s) {
         Matcher styleMatcher = stylePattern.matcher(s);
         s = styleMatcher.replaceAll("");
@@ -242,6 +255,8 @@ public class Utils {
         s = tagMatcher.replaceAll("");
         return entsToTxt(s);
     }
+
+
     private static String entsToTxt(String s) {
         Matcher htmlEntities = htmlEntitiesPattern.matcher(s);
         StringBuilder s2 = new StringBuilder(s);
@@ -256,9 +271,9 @@ public class Utils {
     }
 
 
-
     /**
      * Converts an InputStream to a String.
+     * 
      * @param is InputStream to convert
      * @return String version of the InputStream
      */
@@ -283,6 +298,7 @@ public class Utils {
 
     /**
      * Compress data.
+     * 
      * @param bytesToCompress is the byte array to compress.
      * @return a compressed byte array.
      * @throws java.io.IOException
@@ -313,9 +329,9 @@ public class Utils {
 
 
     /**
-     * Utility method to write to a file.
-     * Throws the exception, so we can report it in syncing log
-     * @throws IOException 
+     * Utility method to write to a file. Throws the exception, so we can report it in syncing log
+     * 
+     * @throws IOException
      */
     public static void writeToFile(InputStream source, String destination) throws IOException {
         Log.i(AnkiDroidApp.TAG, "Creating new file... = " + destination);
@@ -408,7 +424,7 @@ public class Utils {
 
     /**
      * Returns 1 if true, 0 if false
-     *
+     * 
      * @param b The boolean to convert to integer
      * @return 1 if b is true, 0 otherwise
      */
@@ -419,6 +435,7 @@ public class Utils {
 
     /**
      * Get the current time in seconds since January 1, 1970 UTC.
+     * 
      * @return the local system time in seconds
      */
     public static double now() {
@@ -427,62 +444,66 @@ public class Utils {
 
 
     public static String getReadableInterval(Context context, double numberOfDays) {
-    	return getReadableInterval(context, numberOfDays, false);
+        return getReadableInterval(context, numberOfDays, false);
     }
 
 
     public static String getReadableInterval(Context context, double numberOfDays, boolean inFormat) {
-    	double adjustedInterval;
-    	int type;
-    	if (numberOfDays < 1) {
-    		// hours
-    		adjustedInterval = Math.max(1, Math.round(numberOfDays * 24));
-    		type = 0;
-    	} else if (numberOfDays < 30) {
-    		// days
-    		adjustedInterval = Math.round(numberOfDays);
-    		type = 1;
-    	} else if (numberOfDays < 360) {
-    		// months
-    		adjustedInterval = Math.round(numberOfDays / 3);
-    		adjustedInterval /= 10;
-    		type = 2;
-    	} else {
-    		// years
-    		adjustedInterval = Math.round(numberOfDays / 36.5);
-			adjustedInterval /= 10;
-    		type = 3;
-    	}
-   		if (!inFormat) {
-   	    	if (adjustedInterval == 1){
-   	       		return formatDouble(type, adjustedInterval) + " " + context.getResources().getStringArray(R.array.next_review_s)[type];
-   	       	} else {
-   	   			return formatDouble(type, adjustedInterval) + " " + context.getResources().getStringArray(R.array.next_review_p)[type];
-   	    	}   			
-   		} else {
-   	    	if (adjustedInterval == 1){
-   	       		return String.format(context.getResources().getStringArray(R.array.next_review_in_s)[type], formatDouble(type, adjustedInterval));       			       			
-   	       	} else {
-   	   			return String.format(context.getResources().getStringArray(R.array.next_review_in_p)[type], formatDouble(type, adjustedInterval));
-   	    	}   			
-   		}
+        double adjustedInterval;
+        int type;
+        if (numberOfDays < 1) {
+            // hours
+            adjustedInterval = Math.max(1, Math.round(numberOfDays * 24));
+            type = 0;
+        } else if (numberOfDays < 30) {
+            // days
+            adjustedInterval = Math.round(numberOfDays);
+            type = 1;
+        } else if (numberOfDays < 360) {
+            // months
+            adjustedInterval = Math.round(numberOfDays / 3);
+            adjustedInterval /= 10;
+            type = 2;
+        } else {
+            // years
+            adjustedInterval = Math.round(numberOfDays / 36.5);
+            adjustedInterval /= 10;
+            type = 3;
+        }
+        if (!inFormat) {
+            if (adjustedInterval == 1) {
+                return formatDouble(type, adjustedInterval) + " "
+                        + context.getResources().getStringArray(R.array.next_review_s)[type];
+            } else {
+                return formatDouble(type, adjustedInterval) + " "
+                        + context.getResources().getStringArray(R.array.next_review_p)[type];
+            }
+        } else {
+            if (adjustedInterval == 1) {
+                return String.format(context.getResources().getStringArray(R.array.next_review_in_s)[type],
+                        formatDouble(type, adjustedInterval));
+            } else {
+                return String.format(context.getResources().getStringArray(R.array.next_review_in_p)[type],
+                        formatDouble(type, adjustedInterval));
+            }
+        }
     }
 
 
     private static String formatDouble(int type, double adjustedInterval) {
-    	if (type == 0 || (adjustedInterval * 10) % 10 == 0){
-			return String.valueOf((int) adjustedInterval);        			   			
-    	} else {
-       		return String.valueOf(adjustedInterval); 	
-		}
+        if (type == 0 || (adjustedInterval * 10) % 10 == 0) {
+            return String.valueOf((int) adjustedInterval);
+        } else {
+            return String.valueOf(adjustedInterval);
+        }
     }
 
+
     /**
-     *  Returns the effective date of the present moment.
-     *  If the time is prior the cut-off time (9:00am by default as of 11/02/10) return yesterday,
-     *  otherwise today
-     *  Note that the Date class is java.sql.Date whose constructor sets hours, minutes etc to zero
-     *
+     * Returns the effective date of the present moment. If the time is prior the cut-off time (9:00am by default as of
+     * 11/02/10) return yesterday, otherwise today Note that the Date class is java.sql.Date whose constructor sets
+     * hours, minutes etc to zero
+     * 
      * @param utcOffset The UTC offset in seconds we are going to use to determine today or yesterday.
      * @return The date (with time set to 00:00:00) that corresponds to today in Anki terms
      */
@@ -499,21 +520,22 @@ public class Utils {
 
 
     public static String doubleToTime(double value) {
-    	int time = (int) Math.round(value);
-    	int seconds = time % 60;
-    	int minutes = (time - seconds) / 60;
-    	String formattedTime;
-    	if (seconds < 10) {
-    		formattedTime = Integer.toString(minutes) + ":0" + Integer.toString(seconds);
-    	} else {
-    		formattedTime = Integer.toString(minutes) + ":" + Integer.toString(seconds);
-    	}
-    	return formattedTime;
+        int time = (int) Math.round(value);
+        int seconds = time % 60;
+        int minutes = (time - seconds) / 60;
+        String formattedTime;
+        if (seconds < 10) {
+            formattedTime = Integer.toString(minutes) + ":0" + Integer.toString(seconds);
+        } else {
+            formattedTime = Integer.toString(minutes) + ":" + Integer.toString(seconds);
+        }
+        return formattedTime;
     }
 
 
     /**
      * Returns the proleptic Gregorian ordinal of the date, where January 1 of year 1 has ordinal 1.
+     * 
      * @param date Date to convert to ordinal, since 01/01/01
      * @return The ordinal representing the date
      */
@@ -525,6 +547,7 @@ public class Utils {
 
     /**
      * Return the date corresponding to the proleptic Gregorian ordinal, where January 1 of year 1 has ordinal 1.
+     * 
      * @param ordinal representing the days since 01/01/01
      * @return Date converted from the ordinal
      */
@@ -537,6 +560,7 @@ public class Utils {
      * Indicates whether the specified action can be used as an intent. This method queries the package manager for
      * installed packages that can respond to an intent with the specified action. If no suitable package is found, this
      * method returns false.
+     * 
      * @param context The application's environment.
      * @param action The Intent action to check for availability.
      * @return True if an Intent with the specified action can be sent and responded to, false otherwise.
@@ -544,6 +568,7 @@ public class Utils {
     public static boolean isIntentAvailable(Context context, String action) {
         return isIntentAvailable(context, action, null);
     }
+
 
     public static boolean isIntentAvailable(Context context, String action, ComponentName componentName) {
         final PackageManager packageManager = context.getPackageManager();
@@ -553,36 +578,36 @@ public class Utils {
         return list.size() > 0;
     }
 
-    
+
     public static String getBaseUrl(String mediaDir, Model model, Deck deck) {
         String base = model.getFeatures().trim();
         if (deck.getBool("remoteImages") && base.length() != 0 && !base.equalsIgnoreCase("null")) {
             return base;
         } else {
             // Anki desktop calls deck.mediaDir() here, but for efficiency reasons we only call it once in
-            // Reviewer.onCreate() and use the value from there            
-            if (mediaDir != null) {                              
+            // Reviewer.onCreate() and use the value from there
+            if (mediaDir != null) {
                 base = urlEncodeMediaDir(mediaDir);
             }
         }
         return base;
     }
 
+
+    /**
+     * @param mediaDir media directory path on SD card
+     * @return path converted to file URL, properly UTF-8 URL encoded
+     */
     public static String urlEncodeMediaDir(String mediaDir) {
         String base;
-        File mediaDirFile = new File(mediaDir);
-        File parentFile = mediaDirFile.getParentFile();
-        String mediaDirName = mediaDirFile.getName();
-        
-        try {
-            // Use URLEncoder class to ensure the deckName part of the url is properly encoded
-            mediaDirName = URLEncoder.encode(mediaDirName, "UTF-8");
-            // Build complete URL
-            base = parentFile.toURL().toExternalForm() + "/" + mediaDirName + "/";
-        } catch (Exception ex) {
-            Log.e(AnkiDroidApp.TAG, "Building media base URL");
-            throw new RuntimeException(ex);
-        }
+        // Use android.net.Uri class to ensure whole path is properly encoded
+        // File.toURL() does not work here, and URLEncoder class is not directly usable
+        // with existing slashes
+        Uri mediaDirUri = Uri.fromFile(new File(mediaDir));
+
+        // Build complete URL
+        base = mediaDirUri.toString() +"/";
+
         return base;
     }
 
@@ -602,6 +627,8 @@ public class Utils {
         }
         return results;
     }
+
+
     public static long[] toPrimitive(Collection<Long> array) {
         long[] results = new long[array.size()];
         if (array != null) {
@@ -612,17 +639,17 @@ public class Utils {
         }
         return results;
     }
-    
-    
+
+
     /*
-     * Tags
-     **************************************/
-    
+     * Tags************************************
+     */
+
     /**
      * Parse a string and return a list of tags.
      * 
      * @param tags A string containing tags separated by space or comma (optionally followed by space)
-     * @return An array of Strings containing the individual tags 
+     * @return An array of Strings containing the individual tags
      */
     public static String[] parseTags(String tags) {
         if (tags != null && tags.length() != 0) {
@@ -631,12 +658,13 @@ public class Utils {
             return new String[] {};
         }
     }
-    
+
+
     /**
      * Join a list of tags to a string, using spaces as separators
      * 
      * @param tags The list of tags to join
-     * @return The joined tags in a single string 
+     * @return The joined tags in a single string
      */
     public static String joinTags(Collection<String> tags) {
         StringBuilder result = new StringBuilder(128);
@@ -645,7 +673,8 @@ public class Utils {
         }
         return result.toString().trim();
     }
-    
+
+
     /**
      * Strip leading/trailing/superfluous spaces/commas from a tags string. Remove duplicates and sort.
      * 
@@ -663,6 +692,7 @@ public class Utils {
         return joinTags(new TreeSet<String>(taglist));
     }
 
+
     /**
      * Find if tag exists in a set of tags. The search is not case-sensitive
      * 
@@ -679,10 +709,11 @@ public class Utils {
         }
         return false;
     }
-    
+
+
     /**
-     * Add tags if they don't exist.
-     * Both parameters are in string format, the tags being separated by space or comma, as in parseTags
+     * Add tags if they don't exist. Both parameters are in string format, the tags being separated by space or comma,
+     * as in parseTags
      * 
      * @param tagStr The new tag(s) that are to be added
      * @param tags The set of tags where the new ones will be added
@@ -698,13 +729,13 @@ public class Utils {
         return joinTags(currentTags);
     }
 
+
     // Misc
     // *************
 
     /**
-     * MD5 checksum.
-     * Equivalent to python md5.hexdigest()
-     *
+     * MD5 checksum. Equivalent to python md5.hexdigest()
+     * 
      * @param data the string to generate hash from
      * @return A string of length 32 containing the hexadecimal representation of the MD5 checksum of data.
      */
@@ -734,7 +765,8 @@ public class Utils {
     }
 
 
-    public static void updateProgressBars(Context context, View view, double progress, int maxX, int y, boolean singleBar) {
+    public static void updateProgressBars(Context context, View view, double progress, int maxX, int y,
+            boolean singleBar) {
         if (view == null) {
             return;
         }
@@ -746,35 +778,34 @@ public class Utils {
             } else if (progress < 0.75) {
                 view.setBackgroundColor(context.getResources().getColor(R.color.progressbar_3));
             } else {
-                view.setBackgroundColor(context.getResources().getColor(R.color.progressbar_4));            
-            }            
-            FrameLayout.LayoutParams lparam = new FrameLayout.LayoutParams(0, 0);            
+                view.setBackgroundColor(context.getResources().getColor(R.color.progressbar_4));
+            }
+            FrameLayout.LayoutParams lparam = new FrameLayout.LayoutParams(0, 0);
             lparam.height = y;
             lparam.width = (int) (maxX * progress);
             view.setLayoutParams(lparam);
         } else {
-            LinearLayout.LayoutParams lparam = new LinearLayout.LayoutParams(0, 0);            
+            LinearLayout.LayoutParams lparam = new LinearLayout.LayoutParams(0, 0);
             lparam.height = y;
             lparam.width = (int) (maxX * progress);
             view.setLayoutParams(lparam);
         }
-    }  
+    }
 
 
     /**
-     * MD5 sum of file.
-     * Equivalent to checksum(open(os.path.join(mdir, file), "rb").read()))
-     *
+     * MD5 sum of file. Equivalent to checksum(open(os.path.join(mdir, file), "rb").read()))
+     * 
      * @param path The full path to the file
-     * @return A string of length 32 containing the hexadecimal representation of the MD5 checksum of the contents
-     * of the file
+     * @return A string of length 32 containing the hexadecimal representation of the MD5 checksum of the contents of
+     *         the file
      */
     public static String fileChecksum(String path) {
         byte[] bytes = null;
         try {
             File file = new File(path);
             if (file != null && file.isFile()) {
-                bytes = new byte[(int)file.length()];
+                bytes = new byte[(int) file.length()];
                 FileInputStream fin = new FileInputStream(file);
                 fin.read(bytes);
             }
@@ -804,8 +835,8 @@ public class Utils {
         }
         return result;
     }
-    
-    
+
+
     /**
      * Calculate the UTC offset
      */
