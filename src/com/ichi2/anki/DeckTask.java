@@ -216,7 +216,6 @@ public class DeckTask extends AsyncTask<DeckTask.TaskData, DeckTask.TaskData, De
                 deck.answerCard(oldCard, ease);
                 Log.i(AnkiDroidApp.TAG, "leech flag: " + oldCard.getLeechFlag());
             }
-
             newCard = deck.getCard();
             if (oldCard != null) {
                 publishProgress(new TaskData(newCard, oldCard.getLeechFlag(), oldCard.getSuspendedFlag()));
@@ -361,7 +360,7 @@ public class DeckTask extends AsyncTask<DeckTask.TaskData, DeckTask.TaskData, De
         try {
         	oldCardId = deck.undo(currentCardId, inReview);
             newCard = deck.getCard();
-            if (oldCardId != 0) {
+            if (oldCardId != 0 && oldCardId != newCard.getId()) {
             	newCard = deck.cardFromId(oldCardId);
             }
             publishProgress(new TaskData(newCard));
@@ -386,7 +385,7 @@ public class DeckTask extends AsyncTask<DeckTask.TaskData, DeckTask.TaskData, De
         try {
         	oldCardId = deck.redo(currentCardId, inReview);
             newCard = deck.getCard();
-            if (oldCardId != 0) {
+            if (oldCardId != 0 && oldCardId != newCard.getId()) {
             	newCard = deck.cardFromId(oldCardId);
             }
             publishProgress(new TaskData(newCard));

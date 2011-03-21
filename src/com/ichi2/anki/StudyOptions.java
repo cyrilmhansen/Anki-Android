@@ -1226,7 +1226,7 @@ public class StudyOptions extends Activity {
             mEditSessionTime.setText(String.valueOf(timeLimit));
         }
         if (repLimit != 0) {
-            mEditSessionTime.setText(String.valueOf(repLimit));
+            mEditSessionQuestions.setText(String.valueOf(repLimit));
         }
 
         updateLimitTagText(LIMIT_NEW_ACTIVE, deck.getVar("newActive"));
@@ -1478,17 +1478,16 @@ public class StudyOptions extends Activity {
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-    	MenuItem item;
-        item = menu.add(Menu.NONE, MENU_OPEN, Menu.NONE, R.string.menu_open_deck);
-        item.setIcon(R.drawable.ic_menu_manage);
-        item = menu.add(Menu.NONE, MENU_SYNC, Menu.NONE, R.string.menu_sync);
-        item.setIcon(R.drawable.ic_menu_refresh);
-        item = menu.add(Menu.NONE, MENU_ADD_FACT, Menu.NONE, R.string.menu_add_card);
-        item.setIcon(R.drawable.ic_menu_add);
-        item = menu.add(Menu.NONE, MENU_MORE_OPTIONS, Menu.NONE, R.string.studyoptions_more);
-        item.setIcon(R.drawable.ic_menu_archive);
-        item = menu.add(Menu.NONE, MENU_PREFERENCES, Menu.NONE, R.string.menu_preferences);
-        item.setIcon(R.drawable.ic_menu_preferences);
+        Utils.addMenuItemInActionBar(menu, Menu.NONE, MENU_OPEN, Menu.NONE, R.string.menu_open_deck,
+                R.drawable.ic_menu_manage);
+        Utils.addMenuItemInActionBar(menu, Menu.NONE, MENU_SYNC, Menu.NONE, R.string.menu_sync,
+                R.drawable.ic_menu_refresh);
+        Utils.addMenuItem(menu, Menu.NONE, MENU_ADD_FACT, Menu.NONE, R.string.menu_add_card,
+                R.drawable.ic_menu_add);
+        Utils.addMenuItem(menu, Menu.NONE, MENU_MORE_OPTIONS, Menu.NONE, R.string.studyoptions_more,
+                R.drawable.ic_menu_archive);
+        Utils.addMenuItem(menu, Menu.NONE, MENU_PREFERENCES, Menu.NONE, R.string.menu_preferences,
+                R.drawable.ic_menu_preferences);
         return true;
     }
 
@@ -2006,7 +2005,9 @@ public class StudyOptions extends Activity {
                 }
             }
             Deck deck = AnkiDroidApp.deck();
-            mToggleLimit.setChecked(deck.isLimitedByTag() || deck.getSessionRepLimit() + deck.getSessionTimeLimit() > 0);
+            if (deck != null) {
+                mToggleLimit.setChecked(deck.isLimitedByTag() || deck.getSessionRepLimit() + deck.getSessionTimeLimit() > 0);            	
+            }
             mStudyOptionsMain.setVisibility(View.VISIBLE);
         }
 
