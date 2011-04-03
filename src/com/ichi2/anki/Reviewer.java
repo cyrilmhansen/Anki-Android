@@ -296,7 +296,7 @@ public class Reviewer extends Activity {
         @Override
         public void handleMessage(Message msg) {
             Sound.stopSounds();
-            Sound.playSound((String) msg.obj);
+            Sound.playSound((String) msg.obj, false);
         }
     };
 
@@ -375,11 +375,6 @@ public class Reviewer extends Activity {
         @Override
         public void onProgressUpdate(DeckTask.TaskData... values) {
             mCurrentCard = values[0].getCard();
-        }
-
-
-        @Override
-        public void onPostExecute(DeckTask.TaskData result) {
             if (mPrefWhiteboard) {
                 mWhiteboard.clear();
             }
@@ -389,9 +384,13 @@ public class Reviewer extends Activity {
                 mCardTimer.start();
             }
             reviewNextCard();
-            mShakeActionStarted = false;
             mProgressDialog.dismiss();
+        }
 
+
+        @Override
+        public void onPostExecute(DeckTask.TaskData result) {
+            mShakeActionStarted = false;
         }
     };
 
@@ -445,6 +444,8 @@ public class Reviewer extends Activity {
                         Toast.LENGTH_SHORT);
             } else if (mIsLastCard) {
                 mNoMoreCards = true;
+                mProgressDialog = ProgressDialog.show(Reviewer.this, "", getResources()
+                        .getString(R.string.saving_changes), true);
             } else {
                 // session limits not reached, show next card
                 Card newCard = values[0].getCard();
@@ -452,6 +453,8 @@ public class Reviewer extends Activity {
                 // If the card is null means that there are no more cards scheduled for review.
                 if (newCard == null) {
                     mNoMoreCards = true;
+                    mProgressDialog = ProgressDialog.show(Reviewer.this, "", getResources()
+                            .getString(R.string.saving_changes), true);
                     return;
                 }
 
@@ -485,7 +488,43 @@ public class Reviewer extends Activity {
         }
     };
 
-	private Handler mTimerHandler = new Handler();
+
+    DeckTask.TaskListener mSaveAndResetDeckHandler = new DeckTask.TaskListener() {
+        @Override
+        public void onPreExecute() {
+        	if (mProgressDialog != null && mProgressDialog.isShowing()) {
+        		mProgressDialog.setMessage(getResources().getString(R.string.saving_changes));
+        	} else {
+                mProgressDialog = ProgressDialog.show(Reviewer.this, "", getResources()
+                        .getString(R.string.saving_changes), true);
+        	}
+        }
+        @Override
+        public void onPostExecute(DeckTask.TaskData result) {
+        	if (mProgressDialog.isShowing()) {
+                try {
+                    mProgressDialog.dismiss();
+                } catch (Exception e) {
+                    Log.e(AnkiDroidApp.TAG, "onPostExecute - Dialog dismiss Exception = " + e.getMessage());
+                }
+            }
+        	finish();
+        	if (Integer.valueOf(android.os.Build.VERSION.SDK) > 4) {
+        		if (mShowCongrats) {
+        			MyAnimation.slide(Reviewer.this, MyAnimation.FADE);
+        		} else {
+        			MyAnimation.slide(Reviewer.this, MyAnimation.RIGHT);
+        		}
+        	}
+        }
+        @Override
+        public void onProgressUpdate(DeckTask.TaskData... values) {
+            // Pass
+        }
+    };
+
+
+    private Handler mTimerHandler = new Handler();
 
     private Runnable removeChosenAnswerText=new Runnable() {
     	public void run() {
@@ -565,6 +604,12 @@ public class Reviewer extends Activity {
             // Initialize text-to-speech. This is an asynchronous operation.
             if (mSpeakText && Integer.valueOf(android.os.Build.VERSION.SDK) > 3) {
             	ReadText.initializeTts(this, mDeckFilename);
+            }
+
+            // Get last whiteboard state
+            if (mPrefWhiteboard && MetaDB.getWhiteboardState(this, mDeckFilename) == 1) {
+            	mShowWhiteboard = true;
+            	mWhiteboard.setVisibility(View.VISIBLE);
             }
 
             // Load the first card and start reviewing. Uses the answer card task to load a card, but since we send null
@@ -707,8 +752,13 @@ public class Reviewer extends Activity {
         MenuItem item;
         Resources res = getResources();
         if (mPrefWhiteboard) {
-            Utils.addMenuItemInActionBar(menu, Menu.NONE, MENU_WHITEBOARD, Menu.NONE,
-                    R.string.show_whiteboard, R.drawable.ic_menu_compose);
+            if (mShowWhiteboard) {
+                Utils.addMenuItemInActionBar(menu, Menu.NONE, MENU_WHITEBOARD, Menu.NONE,
+                        R.string.hide_whiteboard, R.drawable.ic_menu_compose);
+            } else {
+                Utils.addMenuItemInActionBar(menu, Menu.NONE, MENU_WHITEBOARD, Menu.NONE,
+                        R.string.show_whiteboard, R.drawable.ic_menu_compose);            	
+            }
             Utils.addMenuItemInActionBar(menu, Menu.NONE, MENU_CLEAR_WHITEBOARD, Menu.NONE,
                     R.string.clear_whiteboard, R.drawable.ic_menu_clear_playlist);
         }
@@ -807,10 +857,12 @@ public class Reviewer extends Activity {
                     // Show whiteboard
                     mWhiteboard.setVisibility(View.VISIBLE);
                     item.setTitle(R.string.hide_whiteboard);
+                    MetaDB.storeWhiteboardState(this, mDeckFilename, 1);
                 } else {
                     // Hide whiteboard
                     mWhiteboard.setVisibility(View.GONE);
                     item.setTitle(R.string.show_whiteboard);
+                    MetaDB.storeWhiteboardState(this, mDeckFilename, 0);
                 }
                 return true;
 
@@ -1128,7 +1180,7 @@ public class Reviewer extends Activity {
             mWhiteboard.setOnTouchListener(new View.OnTouchListener() {
                 @Override
                 public boolean onTouch(View v, MotionEvent event) {
-                    if (mWhiteboard.getVisibility() == View.VISIBLE) {
+                    if (mShowWhiteboard) {
                         return false;
                     }
                     if (gestureDetector.onTouchEvent(event)) {
@@ -1166,6 +1218,17 @@ public class Reviewer extends Activity {
         if (mPrefWhiteboard) {
             mWhiteboard.setInvertedColor(true);
         }
+        mFlipCard.setBackgroundDrawable(res.getDrawable(R.drawable.btn_keyboard_key_fulltrans_normal));
+        mEase1.setBackgroundDrawable(res.getDrawable(R.drawable.btn_keyboard_key_fulltrans_normal));
+        mEase2.setBackgroundDrawable(res.getDrawable(R.drawable.btn_keyboard_key_fulltrans_normal));
+        mEase3.setBackgroundDrawable(res.getDrawable(R.drawable.btn_keyboard_key_fulltrans_normal));
+        mEase4.setBackgroundDrawable(res.getDrawable(R.drawable.btn_keyboard_key_fulltrans_normal));
+        mFlipCard.setTextColor(fgColor);
+        mEase1.setTextColor(fgColor);
+        mEase2.setTextColor(fgColor);
+        mEase3.setTextColor(fgColor);
+        mEase4.setTextColor(fgColor);
+
         fgColor = res.getColor(R.color.progressbar_border_inverted);
         bgColor = res.getColor(R.color.progressbar_background_inverted);
         findViewById(R.id.progress_bars_border1).setBackgroundColor(fgColor);
@@ -1321,8 +1384,12 @@ public class Reviewer extends Activity {
 
     private void updateScreenCounts() {
         Deck deck = AnkiDroidApp.deck();
-        int due = deck.getDueCount();
-        setTitle(getResources().getQuantityString(R.plurals.studyoptions_window_title, due, deck.getDeckName(), due, deck.getCardCount()));
+        int eta = deck.getETA();
+        if (deck.hasFinishScheduler() || eta < 1) {
+            setTitle(deck.getDeckName());
+        } else {
+            setTitle(getResources().getQuantityString(R.plurals.reviewer_window_title, eta, deck.getDeckName(), eta));        	
+        }
 
         int _failedSoonCount = deck.getFailedSoonCount();
         int _revCount = deck.getRevCount();
@@ -1335,13 +1402,13 @@ public class Reviewer extends Activity {
         boolean isDue = true; // mCurrentCard.isDue();
         int type = mCurrentCard.getType();
 
-        if (isDue && (type == Card.TYPE_NEW) && (_failedSoonCount + _revCount != 0)) {
+        if (isDue && (type == Card.TYPE_NEW)) {
             newCount.setSpan(new UnderlineSpan(), 0, newCount.length(), 0);
         }
-        if (isDue && (type == Card.TYPE_REV) && (_failedSoonCount + _newCount != 0)) {
+        if (isDue && (type == Card.TYPE_REV)) {
             revCount.setSpan(new UnderlineSpan(), 0, revCount.length(), 0);
         }
-        if (isDue && (type == Card.TYPE_FAILED) && (_revCount + _newCount != 0)) {
+        if (isDue && (type == Card.TYPE_FAILED)) {
             failedSoonCount.setSpan(new UnderlineSpan(), 0, failedSoonCount.length(), 0);
         }
 
@@ -1358,9 +1425,8 @@ public class Reviewer extends Activity {
             mStatisticBarsHeight = view.getHeight();
         }
         Deck deck = AnkiDroidApp.deck();
-        double[] values = deck.getStats(Stats.TYPE_YES_SHARES);
-        Utils.updateProgressBars(this, mDailyBar, values[0], mStatisticBarsMax, mStatisticBarsHeight, true);
-        Utils.updateProgressBars(this, mGlobalBar, values[1], mStatisticBarsMax, mStatisticBarsHeight, true);
+        Utils.updateProgressBars(this, mDailyBar, deck.getProgress(false), mStatisticBarsMax, mStatisticBarsHeight, true);
+        Utils.updateProgressBars(this, mGlobalBar, deck.getProgress(true), mStatisticBarsMax, mStatisticBarsHeight, true);
     }  
 
 
@@ -1852,14 +1918,7 @@ public class Reviewer extends Activity {
 
     private void closeReviewer() {
     	mClosing = true;
-    	finish();
-    	if (Integer.valueOf(android.os.Build.VERSION.SDK) > 4) {
-    		if (mShowCongrats) {
-    			MyAnimation.slide(this, MyAnimation.FADE);
-    		} else {
-    			MyAnimation.slide(this, MyAnimation.RIGHT);
-    		}
-    	}
+        DeckTask.launchDeckTask(DeckTask.TASK_TYPE_SAVE_DECK, mSaveAndResetDeckHandler, new DeckTask.TaskData(AnkiDroidApp.deck(), ""));
     }
 
     class MyGestureDetector extends SimpleOnGestureListener {

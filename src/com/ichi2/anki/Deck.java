@@ -41,6 +41,7 @@ import java.util.Calendar;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -77,16 +78,16 @@ public class Deck {
     public static final double INITIAL_FACTOR = 2.5;
     private static final double MINIMUM_AVERAGE = 1.7;
     private static final double MAX_SCHEDULE_TIME = 36500.0;
-    
+
     public static final String UNDO_TYPE_ANSWER_CARD = "Answer Card";
     public static final String UNDO_TYPE_SUSPEND_CARD = "Suspend Card";
     public static final String UNDO_TYPE_EDIT_CARD = "Edit Card";
     public static final String UNDO_TYPE_MARK_CARD = "Mark Card";
     public static final String UNDO_TYPE_BURY_CARD = "Bury Card";
     public static final String UNDO_TYPE_DELETE_CARD = "Delete Card";
-    
+
     public String mCurrentUndoRedoType = "";
-    
+
 
     // Card order strings for building SQL statements
     private static final String[] revOrderStrings = { "priority desc, interval desc", "priority desc, interval",
@@ -109,7 +110,7 @@ public class Deck {
     private double mLastSync;
 
     private boolean mNeedUnpack = false;
-    
+
     // Scheduling
     // Initial intervals
     private double mHardIntervalMin;
@@ -461,22 +462,20 @@ public class Deck {
         return mFact;
     }
 
-    public TreeMap<Long, CardModel> availableCardModels(Fact fact) {
-        TreeMap<Long, CardModel> cardModels = new TreeMap<Long, CardModel>();
-        TreeMap<Long, CardModel> availableCardModels = new TreeMap<Long, CardModel>();
-        CardModel.fromDb(this, fact.getModelId(), cardModels);
-        for (Map.Entry<Long, CardModel> entry : cardModels.entrySet()) {
+    public LinkedHashMap<Long, CardModel> activeCardModels(Fact fact) {
+    	LinkedHashMap<Long, CardModel> activeCM = new LinkedHashMap<Long, CardModel>();
+        for (Map.Entry<Long, CardModel> entry : cardModels(fact).entrySet()) {
             CardModel cardmodel = entry.getValue();
             if (cardmodel.isActive()) {
                 // TODO: check for emptiness
-                availableCardModels.put(cardmodel.getId(), cardmodel);
+            	activeCM.put(cardmodel.getId(), cardmodel);
             }
         }
-        return availableCardModels;
+        return activeCM;
     }
 
-    public TreeMap<Long, CardModel> cardModels(Fact fact) {
-        TreeMap<Long, CardModel> cardModels = new TreeMap<Long, CardModel>();
+    public LinkedHashMap<Long, CardModel> cardModels(Fact fact) {
+    	LinkedHashMap<Long, CardModel> cardModels = new LinkedHashMap<Long, CardModel>();
         CardModel.fromDb(this, fact.getModelId(), cardModels);
         return cardModels;
     }
@@ -619,7 +618,7 @@ public class Deck {
 
     /**
      * Return the media directory if exists, none if couldn't be created.
-     * 
+     *
      * @param create If true it will attempt to create the folder if it doesn't exist
      * @param rename This is used to simulate the python with create=None that is only used when renaming the mediaDir
      * @return The path of the media directory
@@ -668,7 +667,7 @@ public class Deck {
         Log.i(AnkiDroidApp.TAG, "mediaDir - mediaDir = " + dir);
         return dir;
     }
-    
+
     public String getMediaPrefix() {
         return mMediaPrefix;
     }
@@ -684,7 +683,7 @@ public class Deck {
      * the messages and make a separate call from the UI to static upgradeNotesToMessages in order to properly translate
      * the IDs to messages for viewing. We shouldn't do this directly from the UI, as the messages contain %s variables
      * that need to be populated from deck values, and it's better to contain the libanki logic to the relevant classes.
-     * 
+     *
      * @return True if the upgrade is supported, false if the upgrade needs to be performed by Anki Desktop
      */
     private boolean upgradeDeck() {
@@ -809,7 +808,7 @@ public class Deck {
                         fm.toDB(this);
                     }
                 }
-                
+
                 for (CardModel cm : m.getCardModels()) {
                     // Embed the old font information into card templates
                     String format = cm.getQFormat();
@@ -818,7 +817,7 @@ public class Deck {
                     format = cm.getAFormat();
                     cm.setAFormat(String.format(txt, cm.getAnswerFontFamily(), cm.getAnswerFontSize(),
                             cm.getAnswerFontColour(), format));
-               
+
                     // Escape fields that had no previous styling
                     for (String un : unstyled) {
                         String oldStyle = "%(" + un + ")s";
@@ -992,9 +991,9 @@ public class Deck {
         if (r.size() > 0) {
             getDB().getDatabase().beginTransaction();
             SQLiteStatement st = getDB().getDatabase().compileStatement("UPDATE facts SET spaceUntil=? WHERE id=?");
-            for (Long fid : r.keySet()) {
-                st.bindString(1, r.get(fid));
-                st.bindLong(2, fid.longValue());
+            for (Entry<Long, String> entry : r.entrySet()) {
+                st.bindString(1, entry.getValue());
+                st.bindLong(2, entry.getKey().longValue());
                 st.execute();
             }
             getDB().getDatabase().setTransactionSuccessful();
@@ -1135,22 +1134,22 @@ public class Deck {
     public int[] getDaysReviewed(int day) {
         Date value = Utils.genToday(getUtcOffset() - (86400 * day));
     	Cursor cur = null;
-    	int[] count = {0, 0, 0};   	
+    	int[] count = {0, 0, 0};
     	try {
             cur = getDB().getDatabase().rawQuery(String.format(Utils.ENGLISH_LOCALE,
             		"SELECT reps, (matureease1 + matureease2 + matureease3 + matureease4 +  youngease1 + youngease2 + youngease3 + youngease4), " +
-            		"(matureease1 + matureease2 + matureease3 + matureease4)  FROM stats WHERE day = \'%tF\' AND reps > 0 AND id > 1", value), null);
+            		"(matureease1 + matureease2 + matureease3 + matureease4) FROM stats WHERE day = \'%tF\' AND type = %d", value, Stats.STATS_DAY), null);
             while (cur.moveToNext()) {
             	count[0] = cur.getInt(0);
             	count[1] = cur.getInt(1);
-            	count[2] = cur.getInt(2);            	
+            	count[2] = cur.getInt(2);
             }
         } finally {
             if (cur != null && !cur.isClosed()) {
                 cur.close();
             }
         }
-    	
+
     	return count;
     }
 
@@ -1164,7 +1163,7 @@ public class Deck {
     	int count = 0;
     	try {
             cur = getDB().getDatabase().rawQuery(String.format(Utils.ENGLISH_LOCALE,
-            		"SELECT reviewTime FROM stats WHERE day = \'%tF\' AND reps > 0 AND id > 1", value), null);
+            		"SELECT reviewTime FROM stats WHERE day = \'%tF\' AND reps > 0 AND type = %d", value, Stats.STATS_DAY), null);
             while (cur.moveToNext()) {
             	count = cur.getInt(0);
             }
@@ -1173,58 +1172,59 @@ public class Deck {
                 cur.close();
             }
         }
-    	
+
     	return count;
     }
 
     /*
      * Stats ******************************
      */
-    public double[] getStats(int which) {
-    	double[] stats = Stats.getStats(this, mGlobalStats, mDailyStats);
-    	double[] result;
-    	switch (which) {
-    	    case Stats.TYPE_ETA:
-    	        result = new double[1];
-    	        if (stats[Stats.STATSARRAY_DAILY_AVERAGE_TIME] != 0 && stats[Stats.STATSARRAY_DAILY_REPS] / (mNewCountToday + mRevCount + stats[Stats.STATSARRAY_DAILY_REPS]) > 0.1) {
-    	            result[0] = getETA(stats[Stats.STATSARRAY_DAILY_AVERAGE_TIME], stats[Stats.STATSARRAY_GLOBAL_YOUNG_NO_SHARE]); 
-    	        } else if (stats[Stats.STATSARRAY_GLOBAL_AVERAGE_TIME] != 0) {
-    	            result[0] = getETA(stats[Stats.STATSARRAY_GLOBAL_AVERAGE_TIME], stats[Stats.STATSARRAY_GLOBAL_YOUNG_NO_SHARE]); 
-    	        } else {
-    	            result[0] = -1;
-    	        }
-    	        break;
-            case Stats.TYPE_YES_SHARES:
-                result = new double[2];
-                result[0] = 1 - stats[Stats.STATSARRAY_DAILY_NO] / (stats[Stats.STATSARRAY_DAILY_REPS]);
-                result[1] = stats[Stats.STATSARRAY_GLOBAL_MATURE_YES] / (stats[Stats.STATSARRAY_GLOBAL_MATURE_YES] + stats[Stats.STATSARRAY_GLOBAL_MATURE_NO]);
-                break;
-	        default:
-	            result = new double[1];
-	            result[0] = 0;;
-                break;
+
+    public double getProgress(boolean global) {
+    	if (global) {
+    		return mGlobalStats.getMatureYesShare();
+    	} else {
+    		return mDailyStats.getYesShare();
     	}
-    	return result;
     }
 
 
-    private double getETA(double averageTime, double globalYoungNoShare) {
+    public int getETA() {
+    	if (mDailyStats.getReps() >= 10 && mDailyStats.getAverageTime() > 0) {
+    		return getETA(mFailedSoonCount, mRevCount, mNewCountToday, false);
+		} else if (mGlobalStats.getAverageTime() > 0) {
+			return getETA(mFailedSoonCount, mRevCount, mNewCountToday, true);
+		} else {
+			return -1;
+		}
+    }
+
+
+    public int getETA(int failedCards, int revCards, int newCards, boolean global) {
     	double left;
     	double count;
+    	double averageTime;
+    	if (global) {
+			averageTime = mGlobalStats.getAverageTime();		
+		} else {
+    		averageTime = mDailyStats.getAverageTime();
+		}
+ 
+    	double globalYoungNoShare = mGlobalStats.getYoungNoShare();
 
     	// rev + new cards first, account for failures
-    	count = mNewCountToday + mRevCount;
-    	count *= 1 + (globalYoungNoShare / 100.0);
+    	count = newCards + revCards;
+    	count *= 1 + globalYoungNoShare;
     	left = count * averageTime;
-    	
+
     	//failed - higher time per card for higher amount of cards
     	double failedBaseMulti = 1.5;
     	double failedMod = 0.07;
     	double failedBaseCount = 20;
-    	double factor = (failedBaseMulti + (failedMod * (mFailedSoonCount - failedBaseCount)));
-    	left += mFailedSoonCount * averageTime * factor;
+    	double factor = (failedBaseMulti + (failedMod * (failedCards - failedBaseCount)));
+    	left += failedCards * averageTime * factor;
         	
-    	return left;
+    	return (int) (left / 60);
     }
 
 
@@ -1945,7 +1945,7 @@ public class Deck {
     private void _rebuildRevEarlyCount() {
         // In the future it would be nice to skip the first x days of due cards
 
-        mRevCount = (int) getDB().queryScalar(cardLimit("revActive", "revInactive", String.format(Utils.ENGLISH_LOCALE, 
+        mRevCount = (int) getDB().queryScalar(cardLimit("revActive", "revInactive", String.format(Utils.ENGLISH_LOCALE,
                         "SELECT count() FROM cards c WHERE type = 1 AND combinedDue > %f", mDueCutoff)));
     }
 
@@ -2118,7 +2118,7 @@ public class Deck {
         if ((mRevCount != 0) && mRevQueue.isEmpty()) {
             Cursor cur = null;
             try {
-                Log.i(AnkiDroidApp.TAG, "fill cram queue: " + mActiveCramTags + " " + mCramOrder + " " + mQueueLimit);
+                Log.i(AnkiDroidApp.TAG, "fill cram queue: " + Arrays.toString(mActiveCramTags) + " " + mCramOrder + " " + mQueueLimit);
                 String sql = "SELECT id, factId FROM cards c WHERE type BETWEEN 0 AND 2 ORDER BY " + mCramOrder
                         + " LIMIT " + mQueueLimit;
                 sql = cardLimit(mActiveCramTags, null, sql);
@@ -2441,7 +2441,7 @@ public class Deck {
 
     /**
      * Get the cached total number of cards of the deck.
-     * 
+     *
      * @return The number of cards contained in the deck
      */
     public int getCardCount() {
@@ -2469,7 +2469,7 @@ public class Deck {
 
     /**
 	 * Get the number of mature cards of the deck.
-	 * 
+	 *
 	 * @return The number of cards contained in the deck
 	 */
 	public int getMatureCardCount(boolean restrictToActive) {
@@ -2478,7 +2478,7 @@ public class Deck {
         if (restrictToActive) {
             return (int) getDB().queryScalar(cardLimit("revActive", "revInactive", sql));
         } else {
-            return (int) getDB().queryScalar(sql);            
+            return (int) getDB().queryScalar(sql);
         }
     }
 
@@ -2636,7 +2636,7 @@ public class Deck {
 
     /**
      * Return the next card object.
-     * 
+     *
      * @return The next due card or null if nothing is due.
      */
     public Card getCard() {
@@ -2657,7 +2657,7 @@ public class Deck {
 
     /**
      * Return the next due card Id, or 0
-     * 
+     *
      * @param check Check for expired, or new day rollover
      * @return The Id of the next card, or 0 in case of error
      */
@@ -2781,7 +2781,7 @@ public class Deck {
 
     /**
      * Given a card ID, return a card and start the card timer.
-     * 
+     *
      * @param id The ID of the card to be returned
      */
 
@@ -3090,7 +3090,7 @@ public class Deck {
 
     /**
      * Get a map of card IDs to their associated tags (fact, model and template)
-     * 
+     *
      * @param where SQL restriction on the query. If empty, then returns tags for all the cards
      * @return The map of card IDs to an array of strings with 3 elements representing the triad {card tags, model tags,
      *         template tags}
@@ -3129,7 +3129,7 @@ public class Deck {
 
     /**
      * Returns all model tags, all template tags and a filtered set of fact tags
-     * 
+     *
      * @param where Optional, SQL filter for fact tags. If skipped, returns all fact tags
      * @return All the distinct individual tags, sorted, as an array of string
      */
@@ -3211,9 +3211,10 @@ public class Deck {
 
         ArrayList<HashMap<String, Long>> d = new ArrayList<HashMap<String, Long>>();
 
-        for (Long id : rows.keySet()) {
+        for (Entry<Long, List<String>> entry : rows.entrySet()) {
+        	Long id = entry.getKey();
             for (int src = 0; src < 3; src++) { // src represents the tag type, fact: 0, model: 1, template: 2
-                for (String tag : Utils.parseTags(rows.get(id).get(src))) {
+                for (String tag : Utils.parseTags(entry.getValue().get(src))) {
                     HashMap<String, Long> ditem = new HashMap<String, Long>();
                     ditem.put("cardId", id);
                     ditem.put("tagId", tids.get(tag.toLowerCase()));
@@ -3237,7 +3238,7 @@ public class Deck {
 
     public ArrayList<String[]> getAllCards(String order) {
     	ArrayList<String[]> allCards = new ArrayList<String[]>();
-    	
+
         Cursor cur = null;
         try {
         	cur = getDB().getDatabase().rawQuery("SELECT cards.id, cards.question, cards.answer, " +
@@ -3263,13 +3264,13 @@ public class Deck {
            	    if (tags.contains(TAG_MARKED)) {
            	        data[3] = "1";
            	    } else {
-           	        data[3] = "0";            	    
+           	        data[3] = "0";
            	    }
            	    data[4] = tags + " " + cur.getString(4) + " " + cur.getString(5);
             	if (cur.getString(6).equals("-3")) {
                     data[3] = data[3] + "1";
                 } else {
-                    data[3] = data[3] + "0";                  
+                    data[3] = data[3] + "0";
                 }
             	allCards.add(data);
             }
@@ -3440,7 +3441,7 @@ public class Deck {
 
     /**
      * Suspend cards in bulk. Caller must .reset()
-     * 
+     *
      * @param ids List of card IDs of the cards that are to be suspended.
      */
     public void suspendCards(long[] ids) {
@@ -3457,7 +3458,7 @@ public class Deck {
 
     /**
      * Unsuspend cards in bulk. Caller must .reset()
-     * 
+     *
      * @param ids List of card IDs of the cards that are to be unsuspended.
      */
     public void unsuspendCards(long[] ids) {
@@ -3480,7 +3481,7 @@ public class Deck {
 
     /**
      * Bury all cards for fact until next session. Caller must .reset()
-     * 
+     *
      * @param Fact
      */
     public void buryFact(long factId, long cardId) {
@@ -3508,7 +3509,7 @@ public class Deck {
         flushMod();
     }
 
-    
+
     /**
      * Priorities
      *******************************/
@@ -3517,7 +3518,7 @@ public class Deck {
      * Update all card priorities if changed. If partial is true, only updates cards with tags defined as priority low,
      * med or high in the deck, or with tags whose priority is set to 2 and they are not found in the priority tags of
      * the deck. If false, it updates all card priorities Caller must .reset()
-     * 
+     *
      * @param partial Partial update (true) or not (false)
      * @param dirty Passed to updatePriorities(), if true it updates the modified field of the cards
      */
@@ -3593,9 +3594,9 @@ public class Deck {
         typeAndPriorities.put(mMedPriority, 3);
         typeAndPriorities.put(mHighPriority, 4);
         HashMap<String, Integer> up = new HashMap<String, Integer>();
-        for (String type : typeAndPriorities.keySet()) {
-            for (String tag : Utils.parseTags(type.toLowerCase())) {
-                up.put(tag, typeAndPriorities.get(type));
+        for (Entry<String, Integer> entry : typeAndPriorities.entrySet()) {
+            for (String tag : Utils.parseTags(entry.getKey().toLowerCase())) {
+                up.put(tag, entry.getValue());
             }
         }
         String tag = null;
@@ -3626,7 +3627,7 @@ public class Deck {
 
     /**
      * Update priorities for cardIds in bulk. Caller must .reset().
-     * 
+     *
      * @param cardIds List of card IDs identifying whose cards' priorities to update.
      * @param suspend List of tags. The cards from the above list that have those tags will be suspended.
      * @param dirty If true will update the modified value of each card handled.
@@ -3717,14 +3718,14 @@ public class Deck {
 
     /**
      * Bulk delete cards by ID. Caller must .reset()
-     * 
+     *
      * @param ids List of card IDs of the cards to be deleted.
      */
     public void deleteCards(List<String> ids) {
         Log.i(AnkiDroidApp.TAG, "deleteCards = " + ids.toString());
         String undoName = UNDO_TYPE_DELETE_CARD;
         if (ids.size() == 1) {
-            setUndoStart(undoName, Long.parseLong(ids.get(0)));         
+            setUndoStart(undoName, Long.parseLong(ids.get(0)));
         } else {
             setUndoStart(undoName);
         }
@@ -3794,12 +3795,12 @@ public class Deck {
     /**
      * Add a fact to the deck. Return list of new cards
      */
-    public Fact addFact(Fact fact, TreeMap<Long, CardModel> cardModels) {
+    public Fact addFact(Fact fact, HashMap<Long, CardModel> cardModels) {
         return addFact(fact, cardModels, true);
     }
 
 
-    public Fact addFact(Fact fact, TreeMap<Long, CardModel> cardModels, boolean reset) {
+    public Fact addFact(Fact fact, HashMap<Long, CardModel> cardModels, boolean reset) {
         // TODO: assert fact is Valid
         // TODO: assert fact is Unique
         double now = Utils.now();
@@ -3865,7 +3866,7 @@ public class Deck {
 
     /**
      * Bulk delete facts by ID. Don't touch cards, assume any cards have already been removed. Caller must .reset().
-     * 
+     *
      * @param ids List of fact IDs of the facts to be removed.
      */
     public void deleteFacts(List<String> ids) {
@@ -3893,7 +3894,7 @@ public class Deck {
 
     /**
      * Delete any fact without cards.
-     * 
+     *
      * @return ArrayList<String> list with the id of the deleted facts
      */
     private ArrayList<String> deleteDanglingFacts() {
@@ -3915,7 +3916,7 @@ public class Deck {
 
     /**
      * Delete MODEL, and all its cards/facts. Caller must .reset() TODO: Handling of the list of models and currentModel
-     * 
+     *
      * @param id The ID of the model to be deleted.
      */
     public void deleteModel(String id) {
@@ -4374,7 +4375,7 @@ public class Deck {
     public String getUndoType() {
     	return mCurrentUndoRedoType;
     }
-    
+
     /*
      * Dynamic indices*********************************************************
      */
@@ -4555,7 +4556,7 @@ public class Deck {
 
     /**
      * Return ID for tag, creating if necessary.
-     * 
+     *
      * @param tag the tag we are looking for
      * @param create whether to create the tag if it doesn't exist in the database
      * @return ID of the specified tag, 0 if it doesn't exist, and -1 in the case of error
@@ -4580,7 +4581,7 @@ public class Deck {
 
     /**
      * Gets the IDs of the specified tags.
-     * 
+     *
      * @param tags An array of the tags to get IDs for.
      * @param create Whether to create the tag if it doesn't exist in the database. Default = true
      * @return An array of IDs of the tags.
@@ -4624,14 +4625,14 @@ public class Deck {
 
     /**
      * Initialize an empty deck that has just been creating by copying the existing "empty.anki" file.
-     * 
+     *
      * From Damien:
      * Just copying a file is not sufficient - you need to give each model, cardModel and fieldModel new ids as well, and make sure they are all still linked up. If you don't do that, and people modify one model and then import/export one deck into another, the models will be treated as identical even though they have different layouts, and half the cards will end up corrupted.
      *  It's only the IDs that you have to worry about, and the utcOffset IIRC.
      */
     public static synchronized void initializeEmptyDeck(String deckPath) {
         AnkiDb db = AnkiDatabaseManager.getDatabase(deckPath);
-        
+
         // Regenerate IDs.
         long modelId = Utils.genID();
         db.getDatabase().execSQL("UPDATE models SET id=" + modelId);
@@ -4644,7 +4645,7 @@ public class Deck {
         db.getDatabase().execSQL("UPDATE fieldModels SET modelId=" + modelId);
         db.getDatabase().execSQL("UPDATE cardModels SET modelId=" + modelId);
         db.getDatabase().execSQL("UPDATE decks SET currentModelId=" + modelId);
-        
+
         // Set the UTC offset.
         db.getDatabase().execSQL("UPDATE decks SET utcOffset=" + Utils.utcOffset());
     }
